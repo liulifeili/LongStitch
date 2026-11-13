@@ -103,8 +103,8 @@ public static class UiSmokeTests
         Battery.Add("ui", "缓存预算装不下时按 LRU 淘汰，被淘汰的图按需重新解码且像素逐字节同源", CacheBudgetEvictsLruAndRedecodesOnDemand);
         Battery.Add("ui", "操作收尾的强制回收必须收走死掉的大对象并计数", ReleaseAfterOperationCollectsDeadObjects);
         Battery.Add("ui", "批量分析确认写回后必须触发一次释放回收", AnalysisCompletionTriggersRelease);
-        // ───── 第六十改（未选择拼合模式时不允许添加图片）─────
-        Battery.Add("ui", "未选择拼合模式时不允许添加图片（选好模式后同一批照常导入）", ImportRequiresModeChosen);
+        // ───── 第六十改回修（未选模式不拦导入，选长截图才自动分析）─────
+        Battery.Add("ui", "未选模式时添加图片照常导入（只入列不分析），选了长截图才自动分析", ImportWithoutModeThenAnalysisFollowsMode);
         Battery.Add("ui", "新建项目保留已选模式，全新会话仍是未选", NewProjectKeepsChosenModeFreshStartsUnset);
     }
 
@@ -301,7 +301,7 @@ public static class UiSmokeTests
         List<string> paths = WritePngFiles(dir, count, width, height);
         var form = new MainForm();
         form.CreateControl();
-        form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;
+        form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 夹具指定长截图：文档默认已是 Unset，自动分析只对 LongScroll 起
         form.ImportPaths(paths.ToArray());
         form.PerformLayout();
         return (form, dir);
@@ -586,7 +586,7 @@ public static class UiSmokeTests
             {
                 form.CreateControl();
                 int refresh0 = form.UiRefreshCountForTest;
-                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 夹具指定长截图：文档默认已是 Unset，自动分析只对 LongScroll 起（不写就到不了分析通路）
                 form.ImportPaths(paths.ToArray());
 
                 int refreshed = form.UiRefreshCountForTest - refresh0;
@@ -620,7 +620,7 @@ public static class UiSmokeTests
             try
             {
                 form.CreateControl();
-                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 夹具指定长截图：文档默认已是 Unset，自动分析只对 LongScroll 起（不写就到不了分析通路）
                 form.ImportPaths(paths.ToArray());
 
                 Battery.AssertEqual(files + 2, form.UiRefreshDeferredForTest,
@@ -697,7 +697,7 @@ public static class UiSmokeTests
                 long paints0 = canvas.ScreenPaintsForTest;
                 long deferred0 = canvas.RepaintsDeferredForTest;
 
-                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 夹具指定长截图：文档默认已是 Unset，自动分析只对 LongScroll 起（不写就到不了分析通路）
                 form.ImportPaths(paths.ToArray());
 
                 long during = canvas.ScreenPaintsForTest - paints0;
@@ -735,7 +735,7 @@ public static class UiSmokeTests
             try
             {
                 form.CreateControl();
-                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 夹具指定长截图：文档默认已是 Unset，自动分析只对 LongScroll 起（不写就到不了分析通路）
                 form.ImportPaths(paths.ToArray());
 
                 const int expected = files + 2;
@@ -1279,7 +1279,7 @@ public static class UiSmokeTests
                 using (var form = new MainForm())
                 {
                     form.CreateControl();
-                    form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
+                    form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 夹具指定长截图：文档默认已是 Unset，自动分析只对 LongScroll 起（不写就到不了分析通路）
                     form.ImportPaths(pickedPaths);
                     var names = form.ProjectForTest.Doc.Segments
                         .Select(s => form.ProjectForTest.Doc.FindSource(s.SourceId)!.FileName)
@@ -1296,7 +1296,7 @@ public static class UiSmokeTests
                 using (var form2 = new MainForm())
                 {
                     form2.CreateControl();
-                    form2.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
+                    form2.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 夹具指定长截图：文档默认已是 Unset，自动分析只对 LongScroll 起（不写就到不了分析通路）
                     form2.ImportPaths(new[] { folder });
                     var names = form2.ProjectForTest.Doc.Segments
                         .Select(s => form2.ProjectForTest.Doc.FindSource(s.SourceId)!.FileName)
@@ -1521,7 +1521,7 @@ public static class UiSmokeTests
 
                 using var form = new MainForm();
                 form.CreateControl();
-                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 夹具指定长截图：文档默认已是 Unset，自动分析只对 LongScroll 起（不写就到不了分析通路）
                 form.ImportPaths(paths.ToArray());
                 form.PerformLayout();
 
@@ -1573,7 +1573,7 @@ public static class UiSmokeTests
 
                 using var form = new MainForm();
                 form.CreateControl();
-                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 夹具指定长截图：文档默认已是 Unset，自动分析只对 LongScroll 起（不写就到不了分析通路）
                 form.ImportPaths(new[] { file });
                 form.OpenExportDialogForTest(dir);
                 Battery.Evidence("导出对话框构造完成并算出了计划（未点导出，不落盘）");
@@ -2153,16 +2153,17 @@ public static class UiSmokeTests
     }
 
     /// <summary>
-    /// 第六十改（用户要求）：没选长截图／竖拼／横拼之前，图片一律不收——
-    /// 「不是所有人只用长截屏」，原来默认 LongScroll 的做法等于把竖拼／横拼用户
-    /// 静默套上自动去重的语义。闸在 ImportPaths 一处（三个添加出口都汇到那里）。
-    /// 两头各证一端：未选 → 同一批图收 0 张且<b>屏上必须回话</b>
-    /// （静默拒绝最坏的形状是用户以为拖放坏了，反复拖）；选好 → 同一批照常导入
-    /// （闸只拦「没选」，不许把选过模式的正常添加也拦下）。
-    /// 注意这两趟读的是同一批文件、同一张窗体——选模式的动作走 PickModeSegmentForTest
-    /// （真 UI 通路），闸放行的判据才有资格说「用户选完就能加」。
+    /// 第六十改回修（用户实测：按钮没灰还能点——硬拦改成"只入列不分析"）：
+    /// 添加图片按钮<b>永不变灰</b>，没选模式时导入照常进文档，只是不起自动分析；
+    /// 选模式这一刻（走真 Pick 通路）才补上"最后自动分析（如果是长截图）"。
+    /// 三段各证一头：①未选 + 导入 → 图全进（Sources/Segments 齐）且<b>没有自动分析</b>——
+    /// "没分析"的量法：批量分析写回必触发释放回收钩子（第五十九改③），导入后泵 1.5 秒
+    /// 释放计数不前进；②状态栏回话告诉用户"只入列，选模式后自动分析"（不拦但要说清）；
+    /// ③Pick 长截图 → 泵 15 秒内释放计数必须前进（自动分析真的起来了）。
+    /// 注意"没分析"那半的判据形状：<b>泵了 1.5 秒还不前进</b>，不是"立刻不前进"——
+    /// 分析写回是 BeginInvoke 异步的，不泵消息连误启动的分析都等不到写回，那半就量成空气。
     /// </summary>
-    private static void ImportRequiresModeChosen()
+    private static void ImportWithoutModeThenAnalysisFollowsMode()
     {
         RunOnStaThread(() =>
         {
@@ -2177,35 +2178,51 @@ public static class UiSmokeTests
                     _ = form.Handle;
 
                     // 前提自证：全新窗体的文档必须是「未选」，分段也必须如实显示三档都没抬起——
-                    // 前提不成立（比如有人把默认改回 LongScroll）这格就量不到闸了。
+                    // 前提不成立（比如有人把默认改回 LongScroll）这格就量不到"只入列"了。
                     Battery.AssertEqual(StitchMode.Unset, form.ProjectForTest.Doc.Mode,
                         "前提自证：新建窗体的文档模式必须是 Unset（默认被改走要同步本判据）");
                     Battery.AssertEqual(-1, form.ModeSegmentIndexForTest,
                         "前提自证：未选模式时分段下标必须是 -1（三档都没抬起）");
 
+                    long releaseBefore = MemorySnapshot.ReleaseCountForTest;
                     form.ImportPaths(paths.ToArray());
-                    Battery.AssertEqual(0, form.ProjectForTest.Doc.Sources.Count,
-                        "没选拼合模式时添加图片必须被拦下：一张都不许进文档（Sources 空）");
-                    Battery.AssertEqual(0, form.ProjectForTest.Doc.Segments.Count,
-                        "没选拼合模式时添加图片必须被拦下：段也不能有（Segments 空）");
+                    Battery.AssertEqual(2, form.ProjectForTest.Doc.Sources.Count,
+                        "没选拼合模式时添加图片必须照常收下：按钮不变灰、导入不被拦（Sources=2）");
+                    Battery.AssertEqual(2, form.ProjectForTest.Doc.Segments.Count,
+                        "没选拼合模式时图片照常入列（Segments=2，每张一段）");
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    while (sw.ElapsedMilliseconds < 1_500)
+                    {
+                        Application.DoEvents();
+                        System.Threading.Thread.Sleep(10);
+                    }
+                    Battery.AssertEqual(releaseBefore, MemorySnapshot.ReleaseCountForTest,
+                        "未选模式导入后 1.5 秒内不许起自动分析（写回必触发的释放计数不前进）——" +
+                        "涨了说明分析提前跑了，「先加图还是先选模式」就不是用户自己定的");
 
                     var label = typeof(MainForm).GetField("_statusInfo",
                         System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
                         .GetValue(form) as ToolStripStatusLabel;
                     string statusText = label?.Text ?? "";
-                    Battery.Assert(statusText.Contains("拼合模式"),
-                        $"被拦下时状态栏必须回话告诉用户先选模式（现状：{statusText}）" +
-                        "——静默拒绝等于让用户以为拖放坏了");
+                    Battery.Assert(statusText.Contains("拼合模式") && statusText.Contains("只入列"),
+                        $"导入后状态栏必须说清「没选模式只入列不分析」（现状：{statusText}）——" +
+                        "不拦但不说清，用户会以为分析坏了");
 
-                    // 选好模式（走真 Pick 通路）后，同一批照常导入。
+                    // 选长截图（走真 Pick 通路）这一刻，自动分析必须自己起来。
                     form.PickModeSegmentForTest(0);
                     Battery.AssertEqual(StitchMode.LongScroll, form.ProjectForTest.Doc.Mode,
-                        "Pick 通路必须把文档模式切到长截图（闸放行前的必要条件）");
-                    form.ImportPaths(paths.ToArray());
-                    Battery.AssertEqual(2, form.ProjectForTest.Doc.Sources.Count,
-                        "选好模式后同一批图片必须照常导入：闸只拦「没选」，不许把正常添加也拦下");
-                    Battery.AssertEqual(2, form.ProjectForTest.Doc.Segments.Count, "放行后段也要齐（每张一段）");
-                    Battery.Evidence("未选：2 张全拦（状态栏回话）→ Pick 长截图 → 同一批 2 张照常进文档");
+                        "Pick 通路必须把文档模式切到长截图");
+                    var sw2 = System.Diagnostics.Stopwatch.StartNew();
+                    while (MemorySnapshot.ReleaseCountForTest == releaseBefore && sw2.ElapsedMilliseconds < 15_000)
+                    {
+                        Application.DoEvents();
+                        System.Threading.Thread.Sleep(10);
+                    }
+                    Battery.Assert(MemorySnapshot.ReleaseCountForTest > releaseBefore,
+                        $"选了长截图后必须自动起分析（等了 {sw2.ElapsedMilliseconds}ms）——" +
+                        "15 秒没等到就是 SwitchMode 的自动分析接线断了");
+                    Battery.Evidence("未选：2 张照常入列、1.5 秒无分析（状态栏说清）→ Pick 长截图 → 分析自动起" +
+                                     $"（释放计数 {releaseBefore}→{MemorySnapshot.ReleaseCountForTest}）");
                 }
                 finally { form.Dispose(); }
             }
@@ -3414,7 +3431,7 @@ public static class UiSmokeTests
                 try
                 {
                     form.CreateControl();
-                    form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
+                    form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 夹具指定长截图：文档默认已是 Unset，自动分析只对 LongScroll 起（不写就到不了分析通路）
                     form.ImportPaths(paths.ToArray());
                     long decodeCalls = FileSourceResolver.DecodeCallsTotalForTest - callsBefore;
                     Battery.AssertEqual(3L, decodeCalls,
@@ -3578,7 +3595,7 @@ public static class UiSmokeTests
                     // a control until the window handle has been created"（本格第一趟红在这）。
                     // 访问 Handle 属性是强制创建句柄的唯一公开出口。
                     _ = form.Handle;
-                    form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
+                    form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 夹具指定长截图：文档默认已是 Unset，自动分析只对 LongScroll 起（不写就到不了分析通路）
                     int before = MemorySnapshot.ReleaseCountForTest;
                     form.ImportPaths(paths.ToArray());
                     var sw = System.Diagnostics.Stopwatch.StartNew();

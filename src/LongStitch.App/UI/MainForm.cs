@@ -976,17 +976,10 @@ public sealed partial class MainForm : Form
             return;
         }
 
-        // 第六十改（用户要求）：还没选长截图／竖拼／横拼之前，图片一律不收。
-        // 放在这里而不是更早：拖进来的是 .lstick/.lstickx 项目文件时上面已经转向打开流程，
-        // 只有"真的是要添加图片"这一趟才被闸住。模式不替用户默认——
-        // 原来默认 LongScroll 的做法等于把竖拼／横拼用户静默套上自动去重的语义。
-        // 三个添加出口（左栏按钮 / 菜单 / 拖文件进窗口）都汇到 ImportPaths，闸这一处就够了。
-        if (_project.Doc.Mode == StitchMode.Unset)
-        {
-            Status("请先在顶栏选择拼合模式（长截图／竖拼／横拼），再添加图片");
-            DiagnosticLog.Info("import.rejected", $"reason=mode_unset files={files.Count} revision={_project.Revision}");
-            return;
-        }
+        // 第六十改回修（用户口径）：添加图片按钮<b>永不变灰、导入永不硬拦</b>——
+        // 没选拼合模式时图片照常导入，只是只入列不分析（切换模式那头补自动分析）。
+        // 两种顺序都通：先三选一再加图，或先加图再三选一，由用户自己定。
+        // 拖进来的是 .lstick/.lstickx 项目文件时上面已经转向打开流程，这里只收图片。
 
         // 注意：这里**不再**按文件名重排整批。默认顺序 = 导入顺序；
         // 要按名字排请用菜单「编辑 → 按文件名排序」（显式操作，可撤销）。
@@ -1083,7 +1076,9 @@ public sealed partial class MainForm : Form
                 (failures.Count > 12 ? $"\n… 还有 {failures.Count - 12} 项" : ""),
                 "导入结果", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
-        Status($"导入 {added} 张" + (failures.Count > 0 ? $"，{failures.Count} 张失败" : ""));
+        Status($"导入 {added} 张" + (failures.Count > 0 ? $"，{failures.Count} 张失败" : "") +
+            (_project.Doc.Mode == StitchMode.Unset && added > 0
+                ? "（还没选拼合模式：只入列不分析，在顶栏三选一后长截图会自动分析）" : ""));
         DiagnosticLog.Info("import.end", $"added={added} failed={failures.Count} revision={_project.Revision}");
         Diagnostics.MemorySnapshot.Log("import");
         if (added >= 2 && _project.Doc.Mode == StitchMode.LongScroll) AnalyzeAll();

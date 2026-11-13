@@ -2476,7 +2476,7 @@ public static class CropBandDragTests
 
                 var form = new MainForm();
                 form.CreateControl();
-                // 第六十改：导入闸要求先有模式；夹具直接写字段（不走 Pick，避免多一笔 Mutate 混进账）。
+                // 夹具指定长截图：文档默认已是 Unset，自动分析只对 LongScroll 起（不写就到不了分析通路）；夹具直接写字段（不走 Pick，避免多一笔 Mutate 混进账）。
                 form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;
                 form.ImportPaths(files);
                 Project p = form.ProjectForTest;

@@ -160,6 +160,11 @@ public sealed partial class MainForm
         Status(locksX
             ? $"已切换到「{ModeName(mode)}」：横向位移已锁定，拼缝只能上下移动（X 恒为 0）"
             : $"已切换到「{ModeName(mode)}」");
+        // 第六十改回修：选模式这一刻是"拼图方式"真正定下来的时刻——
+        // 没选模式时导入的图只入列不分析，这里补上"最后自动分析（如果是长截图）"：
+        // 已经攒了 ≥2 张且切成长截图才起自动匹配（与导入那头同一条件）；
+        // 竖拼／横拼不需要匹配，切过去立即按顺序排好，没有"分析"这一步。
+        if (mode == StitchMode.LongScroll && _project.Doc.Segments.Count >= 2) AnalyzeAll();
     }
 
     private static string ModeName(StitchMode mode) => mode switch
