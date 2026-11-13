@@ -4,6 +4,8 @@
 
 本地流程：完成改动 → 运行相关检查 → 只暂存相关文件 → 本地提交 → `.githooks/post-commit` 推送当前分支。
 
+提交标题和正文使用中文，文件名、命令及必要的技术标识可以保留原文。当前不使用 GitHub Actions，仓库内不保留工作流；检查在本地执行。
+
 钩子不会上传未提交的编辑，不会强推，不会自动合并。推送失败仍保留本地提交，错误记录在 `.git/auto-push.log`，排除问题后执行 `git push` 重试。并发推送被跳过时同样需要检查是否有未上传提交。
 
 当前电脑使用 Windows OpenSSH 和 SSH agent。项目级 `core.sshCommand` 只指定公钥身份，私钥由用户自行加载到 agent，AI 不读取私钥或口令。GitHub 主机公钥通过官方 HTTPS `/meta` 接口获取，保存在本机 `.git/github_known_hosts`，SSH 启用严格主机检查。
