@@ -1,0 +1,45 @@
+# GitHub Actions：每次 push 与 PR 都编译 + 跑精度电池，并把免安装单文件传成 artifact。
+#
+# 注意：这个工作流【未在真实 GitHub 环境验证过】。第一次推送后请看 Actions 页确认。
+# 本项目零 NuGet 依赖，所以不需要缓存包、也不会因为网络问题偶发失败。
+
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-check:
+    # 电池里的 ui/* 会构造 WinForms 控件树，需要 Windows runner
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 编译
+        run: dotnet build --nologo -c Release -warnaserror
+
+      - name: 精度电池
+        run: dotnet run --project checks/LongStitch.Checks -c Release --no-build
+        # 退出码非 0 会让这一步失败；"跳过"不算通过，会在末尾单独计数
+
+      - name: 发布免安装单文件
+        run: >
+          dotnet publish src/LongStitch.App -c Release -r win-x64 --self-contained
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: LongStitch-win-x64
+          path: publish/LongStitch.exe
+          if-no-files-found: error

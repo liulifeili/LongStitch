@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    LongStitch.App —— Windows 桌面壳（WinForms + GDI+）。
+
+    这一层只负责三件事，刻意不做图像处理：
+      1. 摆出工作台布局（左侧素材/拼缝、中央画布、右侧参数、底部工具与状态栏）；
+      2. 把鼠标键盘事件翻译成"整数参数变更"，交给 Core；
+      3. 把 Core 产出的 RGBA 瓦片贴到屏幕上。
+
+    为什么用 WinForms 而不是 WPF：
+      WPF 的视觉树建立在 device-independent pixel（1/96 英寸）之上，坐标是浮点的，
+      125%/150% 缩放下"把某个源图像素放到某个屏幕像素"这件事本身就要跟取整搏斗。
+      WinForms 里我们自己控制画布控件的位图与整数平移，缩放只是显示变换，
+      拼合数据永远是源图整数像素，符合 docs/精度红线.md 的第 2 条。
+
+    依赖：只有 Windows Desktop 共享框架（System.Drawing 随它而来），零 NuGet。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>LongStitch.App</RootNamespace>
+    <AssemblyName>LongStitch</AssemblyName>
+    <!-- 免安装单文件发布时在运行时解包到临时目录，保持 exe 只有一个 -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ApplicationIcon></ApplicationIcon>
+    <Product>LongStitch 长截图拼合工具</Product>
+    <AssemblyTitle>LongStitch</AssemblyTitle>
+    <Company>LongStitch</Company>
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0.0</FileVersion>
+    <Copyright>MIT License</Copyright>
+    <Description>把多张滚动截图按像素精确拼成长图，逐条拼缝可复核可手调的离线桌面工具。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LongStitch.Core\LongStitch.Core.csproj" />
+  </ItemGroup>
+
+</Project>

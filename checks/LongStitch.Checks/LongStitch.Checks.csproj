@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    LongStitch.Checks —— 零依赖的"电池"工装（控制台）。
+
+    为什么不用 xUnit：
+      1. 本机与很多协作环境拉不到 NuGet 包，测试工程一旦依赖还原就变成"跑不起来"；
+      2. 这个项目的验收判据是"字节级自证 + 变异守卫"，用一条 dotnet run 就能出
+         逐格 pass/fail 与退出码，比测试框架的日志更好交给下一个 AI 复核。
+
+    为什么 target 到 net8.0-windows：
+      自证测试需要"另一套独立实现"来交叉验证我们自己写的 PNG 编解码。
+      这里借用 Windows Desktop 框架自带的 GDI+（System.Drawing）当独立解码器——
+      只有拿两个互不相关的实现算出同样的字节，才能说"没有静默改动像素"。
+      注意：GDI+ 只用于"读回来核对"，绝不参与产品导出路径。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>LongStitch.Checks</RootNamespace>
+    <AssemblyName>LongStitch.Checks</AssemblyName>
+    <!-- 工装本身产生临时图片，注释要求放宽 -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LongStitch.Core\LongStitch.Core.csproj" />
+    <!--
+      UI 冒烟工装需要构造 MainForm，所以这里也引用 App。
+      注意它只"建控件树 + 跑布局"，不调用 Show/Application.Run：
+      真实交互（拖拼缝、Shift 平移、缩放、导出弹窗）仍然必须真机验收，见 README 的 NOT-RUN 清单。
+    -->
+    <ProjectReference Include="..\..\src\LongStitch.App\LongStitch.App.csproj" />
+  </ItemGroup>
+
+</Project>

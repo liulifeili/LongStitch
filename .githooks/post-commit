@@ -1,0 +1,21 @@
+#!/bin/sh
+# Push committed changes only. A push failure must never discard a local commit.
+branch=$(git symbolic-ref --quiet --short HEAD) || {
+    echo '[LongStitch] Detached HEAD: automatic push skipped.' >&2
+    exit 0
+}
+log=$(git rev-parse --git-path auto-push.log)
+lock=$(git rev-parse --git-path auto-push.lock)
+if ! mkdir "$lock" 2>/dev/null; then
+    echo '[LongStitch] Another automatic push is running; this commit remains local. Retry with git push.' >&2
+    exit 0
+fi
+trap 'rmdir "$lock" 2>/dev/null' EXIT
+echo "[LongStitch] Pushing $branch to origin..."
+if git push --set-upstream origin "$branch" >"$log" 2>&1; then
+    cat "$log"
+else
+    cat "$log" >&2
+    echo '[LongStitch] PUSH FAILED. Local commit is safe. Fix authentication/network or inspect remote changes, then run git push. No force-push or automatic merge was attempted.' >&2
+fi
+exit 0

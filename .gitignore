@@ -1,0 +1,29 @@
+# 构建产物
+bin/
+obj/
+artifacts/
+*.user
+
+# 发布产物（单文件 exe 体积大，不进仓库；用 GitHub Releases 分发）
+publish/
+*.zip
+
+# 本地测试素材：截图可能含私密聊天内容，禁止误提交
+/samples/local/
+/test/
+*.local.png
+
+# 真图拼合工装的输出（成品长图、接缝复核图），由 test/ 派生，同样含私密内容
+/out/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# 精度电池的临时输出
+.checks-tmp/
+
+# Python 缓存
+__pycache__/
+*.py[cod]

@@ -1,0 +1,45 @@
+<Project>
+
+  <!--
+    ============================================================================
+     LongStitch 全解决方案公共编译属性
+    ============================================================================
+     这里集中放三个工程（Core / App / Checks）共享的设置，避免每个 csproj 重复写。
+
+     设计前提（重要，改代码前请先读 docs/精度红线.md）：
+       1. 本项目零 NuGet 依赖。所有图像算子、PNG 编解码、布局与导出都是自研纯托管实现。
+          原因：a) 别人 clone 下来 dotnet build 必定成功，不会因为拉不到包而失败；
+                b) 导出字节完全由我们自己掌控，"一像素不出错"才是可证明的。
+       2. 几何一律整数。任何 float/double 只允许出现在"显示"环节（缩放、平移视口），
+          不允许参与拼合位置、裁切范围、导出尺寸的计算。
+       3. 预览与导出是两套入口，只共享整数 blit 原语，不共享渲染管线。
+    ============================================================================
+  -->
+
+  <PropertyGroup>
+    <!-- C# 12：允许 collection expression 等新语法，但代码里仍以可读为先 -->
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- 可复现构建：同样的源码必须产出同样的字节，这是精度自证测试的前提之一 -->
+    <Deterministic>true</Deterministic>
+    <NeutralLanguage>zh-CN</NeutralLanguage>
+    <!-- 像素拷贝会用到指针，只有 Imaging 层实际需要；统一开启以免工程间不一致 -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- 生成 XML 文档，逼着公共 API 都写上中文说明 -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- 1591 = "公共成员缺少 XML 注释"；1572/1573/1574 = param/typeparam 标记与签名不完全对应。
+         本项目要求注释写详细，但"漏写一个 <param> 标签"不该让整次构建失败——
+         那只会逼人把注释越写越短。真正的约束靠代码评审与中文说明的密度，不靠编译器。 -->
+    <NoWarn>1591;1572;1573;1574</NoWarn>
+  </PropertyGroup>
+
+  <!-- Debug 配置不优化，方便断点；Release 全优化 -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <Optimize>true</Optimize>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+</Project>

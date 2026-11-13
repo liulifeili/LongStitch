@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    LongStitch.Core —— 不依赖任何 UI、不依赖任何 NuGet 包的核心库。
+
+    里面放的是这个产品真正的价值所在：
+      · 整数几何与 RGBA 像素缓冲（RgbaImage）
+      · 自研 PNG 编解码（无损路径的精度地基）
+      · 项目模型、布局引擎、撤销栈、项目文件读写
+      · 长截图重叠匹配算法
+      · 滚动条 / 状态栏 / 底部固定栏清理检测
+      · 分块导出与分段导出
+      · 视口瓦片预览层
+
+    刻意保持 net8.0（不是 net8.0-windows）：这样 Checks 工装能在任何环境下跑，
+    也逼着核心层不许出现 System.Drawing 之类的平台绑定。
+    JPEG / WebP 这些需要平台解码器的格式，由 App 层以 IImageDecoder 插件形式注入。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>LongStitch.Core</RootNamespace>
+    <AssemblyName>LongStitch.Core</AssemblyName>
+  </PropertyGroup>
+
+</Project>
