@@ -1174,6 +1174,7 @@ public sealed partial class MainForm : Form
                     _canvas.FollowContentCentre();
                     DiagnosticLog.Info("analysis.all_done", $"generation={ticket.Generation} results={results.Count} passed={results.Count(r => r.Status == SeamStatus.AutoPassed)} review={results.Count(r => r.Status == SeamStatus.NeedsReview)} revision={project.Revision}");
                     Diagnostics.MemorySnapshot.Log("analyze_all");
+                    Diagnostics.MemorySnapshot.ReleaseAfterOperation("analyze_all");
                 });
             }, token);
         }
@@ -1646,6 +1647,7 @@ public sealed partial class MainForm : Form
                 : $"重新分析完成：{Theme.StatusText(after.Status)}");
             DiagnosticLog.Info("analysis.one_done", $"generation={ticket.Generation} seam={seamId} status={after.Status} auto_status={after.AutoStatus} manual={after.IsManual} revision={_project.Revision}");
             Diagnostics.MemorySnapshot.Log("analyze_one");
+            Diagnostics.MemorySnapshot.ReleaseAfterOperation("analyze_one");
         }
         catch (OperationCanceledException)
         {

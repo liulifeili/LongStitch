@@ -650,6 +650,7 @@ public sealed class ExportDialog : Form
         }
         DiagnosticLog.Info("export.end", $"success={outcome.Success} cancelled={outcome.Cancelled} files={string.Join(";", outcome.Files)} error={outcome.Error}");
         Diagnostics.MemorySnapshot.Log("export");
+        Diagnostics.MemorySnapshot.ReleaseAfterOperation("export");
 
         _progressRow.Visible = false;
         _exporting = false;

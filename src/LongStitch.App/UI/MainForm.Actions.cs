@@ -185,6 +185,7 @@ public sealed partial class MainForm
         DiagnosticLog.Info("project.new", $"revision={_project.Revision}");
         // "关闭项目"在本产品里的唯一形状就是新建/打开顶掉当前文档（第五十九改内存快照按它记账）。
         Diagnostics.MemorySnapshot.Log("project_close");
+        Diagnostics.MemorySnapshot.ReleaseAfterOperation("project_close");
         _canvas.SelectSeam(null);
         Status("新项目");
     }

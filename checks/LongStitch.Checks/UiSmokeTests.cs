@@ -1,3 +1,4 @@
+using LongStitch.App.Diagnostics;
 using LongStitch.App.Imaging;
 using LongStitch.App.UI;
 using LongStitch.Core;
@@ -100,6 +101,8 @@ public static class UiSmokeTests
         Battery.Add("ui", "新建项目后源图缓存必须清零", NewProjectClearsSourceCache);
         Battery.Add("ui", "素材列表刷新与销毁时旧缩略图必须被显式释放", ThumbnailDisposalIsDeterministic);
         Battery.Add("ui", "缓存预算装不下时按 LRU 淘汰，被淘汰的图按需重新解码且像素逐字节同源", CacheBudgetEvictsLruAndRedecodesOnDemand);
+        Battery.Add("ui", "操作收尾的强制回收必须收走死掉的大对象并计数", ReleaseAfterOperationCollectsDeadObjects);
+        Battery.Add("ui", "批量分析确认写回后必须触发一次释放回收", AnalysisCompletionTriggersRelease);
     }
 
     /// <summary>
@@ -3380,6 +3383,102 @@ public static class UiSmokeTests
                              "最新→最旧取数只补解码被淘汰的 1 张、像素逐字节同源");
         }
         finally { TryDelete(dir); }
+    }
+
+    /// <summary>
+    /// 机制格（第五十九改③）：释放钩子必须<b>真的把死掉的大对象收走</b>，并把触发次数记下来。
+    ///
+    /// 真窗口的账：缓存驻留只有 542MB，托管堆却 1.53GB——差额约 1GB 是匹配临时副本与
+    /// 解码中间缓冲这类<b>已经不可达却没人催收</b>的 LOH 大对象（gen2 才 36 次）。
+    /// 「操作确认完毕后释放内存」这条用户要求落成 <c>MemorySnapshot.ReleaseAfterOperation</c>，
+    /// 本格证明它不是空转：造一枚 ≥85KB（真落 LOH）的死对象，先自证"它此刻还活着"
+    /// （被并发回收抢先就重试创建，连试 10 次都不活说明环境吵到量的是空气，宁可红），
+    /// 然后调一次钩子。判据是<b>两把一起</b>：<c>GC.CollectionCount(2)</c> 必须前进
+    /// （钩子的全额阻塞回收是它唯一的来路——摘掉 <c>GC.Collect</c> 那一行就红），
+    /// 且死对象要在这趟回收里被收走。等待窗只有 3 秒：第一版给了 10 秒，
+    /// 环境的自然回收在这窗口里把探针假绿救活过一次（判据没牙），收窄到 3 秒后
+    /// 只有真跑了 <c>GC.Collect</c> 才绿。计数必须恰好 +1——漏计=判据看不到接线，多计=钩子重复触发。
+    /// </summary>
+    private static void ReleaseAfterOperationCollectsDeadObjects()
+    {
+        int before = MemorySnapshot.ReleaseCountForTest;
+        GC.Collect();                       // 先把环境噪音回收排空，让 gen2 计数落定
+        int gen2Before = GC.CollectionCount(2);
+        WeakReference wr = CreateDeadLargeObject();
+        int tries = 0;
+        while (!wr.IsAlive && tries < 10) { wr = CreateDeadLargeObject(); tries++; }
+        Battery.Assert(wr.IsAlive,
+            "自证：8MB 大对象此刻必须还活着（连试 10 次都被并发回收抢先就是环境太吵，量的是空气）");
+        MemorySnapshot.ReleaseAfterOperation("battery");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        bool collected = false;
+        while (sw.ElapsedMilliseconds < 3_000)
+        {
+            if (!wr.IsAlive || GC.CollectionCount(2) > gen2Before) { collected = true; break; }
+            System.Threading.Thread.Sleep(10);
+        }
+        Battery.Assert(collected,
+            $"释放钩子必须在 3 秒内跑完那次全额回收（等了 {sw.ElapsedMilliseconds}ms）——" +
+            "死对象没收走且 gen2 计数没前进，说明 GC.Collect 根本没执行，钩子就是空转");
+        Battery.AssertEqual(before + 1, MemorySnapshot.ReleaseCountForTest,
+            "每调一次释放钩子计数必须恰好 +1（漏计=判据看不到接线，多计=钩子重复触发）");
+        Battery.Evidence($"8MB 死对象在 {sw.ElapsedMilliseconds}ms 内被收走（gen2 {gen2Before}→{GC.CollectionCount(2)}），" +
+                         $"释放计数 {before}→{before + 1}");
+    }
+
+    private static WeakReference CreateDeadLargeObject()
+    {
+        var big = new byte[8 * 1024 * 1024];   // ≥85KB ⇒ 直接落大对象堆
+        big[0] = 0xAB;                          // 写一笔防 JIT 把没被读的分配优化掉
+        return new WeakReference(big);
+    }
+
+    /// <summary>
+    /// 接线格（第五十九改③）：批量分析确认写回后必须触发一次释放回收。
+    ///
+    /// 用户口径是「把某个需要检查的确认完毕后，应该释放部分内存，而不是继续增大」——
+    /// 批量分析（导入 ≥2 张自动起的那趟）正是最大的临时副本制造者（matchTemporaryBytesTotal
+    /// 累计 2.41GB 的来路）。本格走真通路：离屏窗体导入 2 张真 PNG → 自动起 <c>AnalyzeAll</c>
+    /// → 写回回调末尾的 <c>ReleaseAfterOperation("analyze_all")</c> 必须把计数推上去。
+    /// <see cref="RunOnStaThread"/> 的 STA 线程<b>不泵消息</b>，BeginInvoke 回调必须靠
+    /// <c>DoEvents</c> 喂进去——只睡不泵的话永远等不到。探针摘掉接线调用那一行本格就红
+    /// （判据名与 MemorySnapshot 注释里引用的全名逐字一致，doc_cell_check 会核对）。
+    /// </summary>
+    private static void AnalysisCompletionTriggersRelease()
+    {
+        RunOnStaThread(() =>
+        {
+            string dir = Path.Combine(Path.GetTempPath(), "ls-ui-" + Guid.NewGuid().ToString("N")[..6]);
+            List<string> paths = WritePngFiles(dir, count: 2, width: 60, height: 120);
+            try
+            {
+                var form = new MainForm();
+                try
+                {
+                    form.CreateControl();
+                    // CreateControl 只造"可见子控件"的树，窗体不可见时句柄未必建出来；
+                    // 而分析写回从后台线程 BeginInvoke，句柄不存在就抛"cannot be called on
+                    // a control until the window handle has been created"（本格第一趟红在这）。
+                    // 访问 Handle 属性是强制创建句柄的唯一公开出口。
+                    _ = form.Handle;
+                    int before = MemorySnapshot.ReleaseCountForTest;
+                    form.ImportPaths(paths.ToArray());
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    while (MemorySnapshot.ReleaseCountForTest == before && sw.ElapsedMilliseconds < 15_000)
+                    {
+                        Application.DoEvents();
+                        System.Threading.Thread.Sleep(10);
+                    }
+                    Battery.Assert(MemorySnapshot.ReleaseCountForTest > before,
+                        $"批量分析确认写回后必须触发一次释放回收（等了 {sw.ElapsedMilliseconds}ms）——" +
+                        "15 秒没等到就是接线断了，或分析根本没跑完");
+                    Battery.Evidence($"导入 2 张自动分析：释放计数 {before}→{MemorySnapshot.ReleaseCountForTest}" +
+                                     $"（{sw.ElapsedMilliseconds}ms 内）");
+                }
+                finally { form.Dispose(); }
+            }
+            finally { TryDelete(dir); }
+        });
     }
 
     /// <summary>

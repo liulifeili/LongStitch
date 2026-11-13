@@ -91,6 +91,50 @@ public static class MemorySnapshot
         }
     }
 
+    private static int _releaseCount;
+    /// <summary>释放回收已触发的次数（电池判据的取数口；与 mem.release 日志行一对一）。</summary>
+    public static int ReleaseCountForTest => System.Threading.Volatile.Read(ref _releaseCount);
+
+    /// <summary>
+    /// 操作收尾的强制回收钩子（第五十九改③）。
+    ///
+    /// ═══ 为什么必须有这一步 ═══
+    /// 真窗口账目（mem.snapshot，44 张源图会话）：缓存驻留合计约 542MB
+    /// （源图 LRU 530MB ＋ 瓦片 12MB，都在设计预算内），但托管堆 1.53GB、其中 LOH 1.42GB——
+    /// 约 1GB 是<b>已经死掉却没人催收</b>的大对象（匹配整段 SubInput 临时副本、解码中间缓冲，
+    /// matchTemporaryBytesTotal 累计 2.41GB 就是它们的来路）。gen2 才 36 次，
+    /// .NET 对 LOH 从不主动催——用户在任务管理器里看到的工作集 1.94GB 就是这笔账。
+    ///
+    /// ═══ 在哪些时刻触发 ═══
+    /// "用户确认完毕"的四个收尾点：批量分析写回后、单缝确认写回后、导出结束后、
+    /// 新建/打开项目清理缓存后。判据
+    /// <c>ui/批量分析确认写回后必须触发一次释放回收</c> 钉其中分析这一线。
+    ///
+    /// ═══ 为什么 GC 放在后台线程 ═══
+    /// 全额阻塞回收在大堆上要几百毫秒，落在 UI 线程上就是一次肉眼可见的卡顿——
+    /// 与"读数不许成为卡顿来源"同一纪律。freedBytes 可为负（回收期间别的线程又分配了），
+    /// 那是方向读数不是缺陷。
+    /// </summary>
+    public static void ReleaseAfterOperation(string stage)
+    {
+        long beforeBytes = GC.GetTotalMemory(forceFullCollection: false);
+        System.Threading.Interlocked.Increment(ref _releaseCount);
+        System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+        {
+            try
+            {
+                GC.Collect(2, GCCollectionMode.Forced, blocking: true);
+                long afterBytes = GC.GetTotalMemory(forceFullCollection: false);
+                DiagnosticLog.Info("mem.release",
+                    $"stage={stage} beforeBytes={beforeBytes} afterBytes={afterBytes} freedBytes={beforeBytes - afterBytes}");
+            }
+            catch
+            {
+                // 诊断不许变成产品失败——与 Log 同一条纪律。
+            }
+        });
+    }
+
     private static string BuildDetail(string stage)
     {
         Process self = Process.GetCurrentProcess();
