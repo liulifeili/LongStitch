@@ -99,6 +99,7 @@ public static class UiSmokeTests
         Battery.Add("ui", "导入 N 张 PNG 全程只解码 N 次（预热缓存与重新解码逐字节同源）", ImportDecodesEachFileExactlyOnce);
         Battery.Add("ui", "新建项目后源图缓存必须清零", NewProjectClearsSourceCache);
         Battery.Add("ui", "素材列表刷新与销毁时旧缩略图必须被显式释放", ThumbnailDisposalIsDeterministic);
+        Battery.Add("ui", "缓存预算装不下时按 LRU 淘汰，被淘汰的图按需重新解码且像素逐字节同源", CacheBudgetEvictsLruAndRedecodesOnDemand);
     }
 
     /// <summary>
@@ -3313,6 +3314,72 @@ public static class UiSmokeTests
             }
             finally { TryDelete(dir); }
         });
+    }
+
+    /// <summary>
+    /// 缓存预算装不下时的边界（第五十九改②回修）。
+    ///
+    /// 「导入 N 张 PNG 全程只解码 N 次（预热缓存与重新解码逐字节同源）」用的是 3 张小图，
+    /// 全部装得进 512MB 默认预算——它只能证明"未被淘汰的像素能复用"，答不了"图多到装不下会怎样"。
+    /// 本格把预算压到只装 2 张（<c>FileSourceResolver.CacheLimitBytes</c> 是产品自己开放的旋钮，
+    /// 不靠改产品源码），3 张真 PNG 各解码一次后 Prime 进缓存：最旧那张必须被 LRU 淘汰；
+    /// 随后按"最新→最旧"取数，驻留的两张命中不再解码，被淘汰的那张按需重新解码一次——
+    /// 这是 LRU 的正常行为，不是像素错误，也不该靠无限扩大缓存去"消灭"它；
+    /// 重新解码出来的像素必须与首次解码逐字节相同。探针把 <c>Trim()</c> 从 Prime 里摘掉就能让本格红。
+    /// </summary>
+    private static void CacheBudgetEvictsLruAndRedecodesOnDemand()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "ls-evict-" + Guid.NewGuid().ToString("N")[..6]);
+        Directory.CreateDirectory(dir);
+        try
+        {
+            const int W = 60, H = 120, N = 3, BudgetFit = 2;
+            long bytesPerImage = (long)W * H * 4;
+            List<string> paths = WritePngFiles(dir, count: N, width: W, height: H);
+            var resolver = new FileSourceResolver { CacheLimitBytes = bytesPerImage * BudgetFit };
+            var ids = new string[N];
+            var originals = new RgbaImage[N];
+            long callsBefore = FileSourceResolver.DecodeCallsTotalForTest;
+
+            // 与导入通路同形：每个文件 Decode 一次，像素经 Prime 移交进缓存（所有权移交语义）。
+            for (int i = 0; i < N; i++)
+            {
+                DecodedImage decoded = FileSourceResolver.Decode(paths[i]);
+                originals[i] = decoded.Image;
+                var src = new SourceImage
+                {
+                    Id = Project.NewId("src"), Path = paths[i], FileName = Path.GetFileName(paths[i]),
+                    Size = new IntSize(W, H), Format = "png",
+                };
+                resolver.Register(src);
+                ids[i] = src.Id;
+                resolver.Prime(src.Id, decoded.Image);
+            }
+
+            long decodeCalls = FileSourceResolver.DecodeCallsTotalForTest - callsBefore;
+            Battery.AssertEqual((long)N, decodeCalls,
+                "装料阶段每个文件只许解码一次（Prime 只搬像素，不该再触发解码）");
+            Battery.AssertEqual(BudgetFit, resolver.CachedCount,
+                $"预算只装得下 {BudgetFit} 张时驻留必须正好 {BudgetFit} 张——实际 {resolver.CachedCount} 张" +
+                "（多 = 淘汰通路没跑，少 = 把装得下的也丢了）");
+            Battery.Assert(!resolver.CachedIdsNewestFirst.Contains(ids[0]),
+                "最旧那张必须已被 LRU 淘汰出驻留名单（淘汰了最旧的才叫 LRU）");
+            Battery.Assert(resolver.CachedBytes <= resolver.CacheLimitBytes,
+                "驻留字节数不许越过预算线");
+
+            // 按"最新→最旧"取数：驻留的两张命中（解码 +0），被淘汰的那张按需重新解码（+1）。
+            resolver.Resolve(ids[2]);
+            resolver.Resolve(ids[1]);
+            long beforeEvicted = FileSourceResolver.DecodeCallsTotalForTest;
+            RgbaImage redecoded = resolver.Resolve(ids[0]);
+            Battery.AssertEqual(1L, FileSourceResolver.DecodeCallsTotalForTest - beforeEvicted,
+                "只有被淘汰的那张该重新解码：驻留两张命中（+0），淘汰一张按需重解（+1）");
+            Battery.Assert(redecoded.PixelsRo.SequenceEqual(originals[0].PixelsRo),
+                "被淘汰的图重新解码出的像素必须与首次解码逐字节相同——LRU 丢的是副本，不是保真度");
+            Battery.Evidence($"预算 {resolver.CacheLimitBytes}B 只装 {BudgetFit} 张：Prime {N} 张驻留 {BudgetFit} 张、" +
+                             "最新→最旧取数只补解码被淘汰的 1 张、像素逐字节同源");
+        }
+        finally { TryDelete(dir); }
     }
 
     /// <summary>

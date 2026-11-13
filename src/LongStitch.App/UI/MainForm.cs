@@ -1025,8 +1025,10 @@ public sealed partial class MainForm : Form
                     };
                     _resolver.Register(source);
                     // 第五十九改③：这次解码出来的像素交给 Resolver 缓存（所有权移交），
-                    // 不再"取完元数据就扔"。画布首屏/缩略图/分析随后 Resolve 全部命中缓存，
-                    // 同一张文件不再解码第二遍——判据 ui/导入 N 张 PNG 全程只解码 N 次（预热缓存与重新解码逐字节同源） 从
+                    // 不再"取完元数据就扔"。缓存未被淘汰时，画布首屏/缩略图/分析随后 Resolve
+                    // 全部命中缓存，同一张文件不再解码第二遍（预算装不下被淘汰的图按需重新解码，
+                    // LRU 正常行为，判据 ui/缓存预算装不下时按 LRU 淘汰，被淘汰的图按需重新解码且像素逐字节同源）——
+                    // 判据 ui/导入 N 张 PNG 全程只解码 N 次（预热缓存与重新解码逐字节同源） 从
                     // FileSourceResolver.DecodeCallsTotalForTest 取数。
                     _resolver.Prime(source.Id, decoded.Image);
                     _project.Doc.Sources.Add(source);

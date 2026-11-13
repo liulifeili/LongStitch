@@ -21,16 +21,17 @@ namespace LongStitch.App.Diagnostics;
 ///    TileBitmap（GDI 位图缓存）、Thumbnail（列表缩略图）——它们都是"可丢弃副本"，
 ///    数值直接来自缓存自己的计数器，不许界面猜。
 /// ② 过程/进程量：托管堆、各代 GC 次数、LOH 大小、Private/WorkingSet、
-///    全句柄数、在途解码缓冲、匹配临时副本累计。
+///    全句柄数、解码并发峰值（数调用次数，不是缓冲区数量）、匹配临时副本累计分配量。
 ///
 /// ═══ ProcessHandles 为什么替代不了 GdiHandleCount ═══
 /// 用户方案里点名的"真 GDI 句柄数"要用 <c>GetGuiResources</c> 那种 Win32 调用取，
 /// 而本产品的红线是<b>产品内不得 P/Invoke</b>。这里记的 <c>processHandles</c> 是
-/// <b>进程全部句柄数（HandleCount），不是 GDI 对象数</b>——文件、线程、事件、GDI 都混在里面，
-/// GDI 位图泄不泄漏<b>不能</b>从它读出来。GDI 位图那一头靠我们自己创建、自己记账的
-/// <c>tileBitmapCount/thumbnailCount</c>（精确）来盯；判"旧的缩略图真的被释放了"
+/// <b>进程全部句柄数（HandleCount），不是 GDI 对象数</b>，GDI 位图泄不泄漏
+/// <b>不能</b>从它读出来。GDI 对象数要单独统计：那条路在本产品里开不了
+/// （红线禁 P/Invoke），逐字节级精确的 GDI 句柄审计留给 Checks 工装那一侧
+/// （那里允许 P/Invoke），本批未做、如实记账。GDI 位图那一头先靠我们自己创建、
+/// 自己记账的 <c>tileBitmapCount/thumbnailCount</c>（精确）来盯；判"旧的缩略图真的被释放了"
 /// 另有 SourcePanel 的 <c>ThumbsDisposedForTest</c> 计数器（第五十九改②）。
-/// 逐字节级精确的 GDI 句柄审计留给 Checks 工装那一侧（那里允许 P/Invoke）。
 ///
 /// ═══ 两个名字里的"陷阱"（第五十九改②口径修正） ═══
 /// <c>matchTemporaryBytesTotal</c> 是进程启动以来匹配输入副本的<b>累计分配量</b>——
