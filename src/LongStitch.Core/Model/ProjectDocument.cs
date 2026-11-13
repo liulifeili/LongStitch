@@ -18,7 +18,10 @@ public sealed class ProjectDocument
 
     public string Title { get; set; } = "未命名项目";
 
-    public StitchMode Mode { get; set; } = StitchMode.LongScroll;
+    // 第六十改：默认"未选择"。产品在导入入口把关——没选模式不给加图片，
+    // 所以匹配／布局永远见不到 Unset。原来默认 LongScroll 是替用户做的决定，
+    // 而竖拼／横拼用户会被静默套上长截图的自动去重语义。
+    public StitchMode Mode { get; set; } = StitchMode.Unset;
 
     /// <summary>导入的源图（按导入顺序记录，与拼合顺序无关）。</summary>
     public List<SourceImage> Sources { get; set; } = new();

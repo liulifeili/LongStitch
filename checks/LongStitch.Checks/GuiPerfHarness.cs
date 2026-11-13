@@ -906,6 +906,8 @@ internal static class GuiPerfHarness
                 return 2;
             }
 
+            // 第六十改：导入闸要求先有模式；夹具直接写字段（不走 Pick，避免多一笔 Mutate）。
+            form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;
             form.ImportPaths(files);
             Project project = form.ProjectForTest;
             project.Mutate("切到长截图并设定重叠", doc =>

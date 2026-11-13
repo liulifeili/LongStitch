@@ -16,7 +16,9 @@ internal sealed class SegmentedControl : Control
 {
     private readonly string[] _labels;
     private int[] _widths = Array.Empty<int>();
-    private int _selected;
+    // 第六十改：-1 = 没有任何一档被选中。新建项目时文档模式是 Unset（还没选），
+    // 分段必须如实显示"三档都没抬起"，而不是替用户默认抬起第一档。
+    private int _selected = -1;
     private int _hover = -1;
     private readonly ToolTip _tip = new();
 
@@ -74,15 +76,20 @@ internal sealed class SegmentedControl : Control
         get => _selected;
         set
         {
-            int clamped = Math.Clamp(value, 0, _labels.Length - 1);
+            // 第六十改：-1（未选中）也是合法值，与文档的 StitchMode.Unset 一一对应；
+            // 其余照旧夹回合法档位区间。
+            int clamped = value == -1 ? -1 : Math.Clamp(value, 0, _labels.Length - 1);
             if (clamped == _selected) return;
             _selected = clamped;
             Invalidate();
         }
     }
 
-    /// <summary>供判据：当前选中档的文字（不许拿别的读数冒充选中态）。</summary>
-    internal string SelectedText => _labels[_selected];
+    /// <summary>当前是否有任何一档被选中（第六十改）。判据用这个而不是猜 SelectedText。</summary>
+    internal bool HasSelection => _selected >= 0;
+
+    /// <summary>供判据：当前选中档的文字（不许拿别的读数冒充选中态）；没有任何选中档时是空串。</summary>
+    internal string SelectedText => _selected >= 0 ? _labels[_selected] : "";
 
     internal SegmentedControl(params string[] labels)
     {
@@ -144,6 +151,8 @@ internal sealed class SegmentedControl : Control
     {
         get
         {
+            if (_selected < 0)
+                throw new InvalidOperationException("分段控件此刻没有选中档（未选模式状态）——要量几何请先把某一档选中");
             Rectangle seg = SegmentRect(_selected);
             Rectangle thumb = ThumbRect(seg);
             return (TextRect(seg), thumb, UnderlineRect(thumb));

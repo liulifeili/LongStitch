@@ -2476,6 +2476,8 @@ public static class CropBandDragTests
 
                 var form = new MainForm();
                 form.CreateControl();
+                // 第六十改：导入闸要求先有模式；夹具直接写字段（不走 Pick，避免多一笔 Mutate 混进账）。
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;
                 form.ImportPaths(files);
                 Project p = form.ProjectForTest;
                 p.Mutate("切到长截图并设定重叠", _ =>

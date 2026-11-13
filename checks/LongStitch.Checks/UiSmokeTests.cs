@@ -103,6 +103,9 @@ public static class UiSmokeTests
         Battery.Add("ui", "缓存预算装不下时按 LRU 淘汰，被淘汰的图按需重新解码且像素逐字节同源", CacheBudgetEvictsLruAndRedecodesOnDemand);
         Battery.Add("ui", "操作收尾的强制回收必须收走死掉的大对象并计数", ReleaseAfterOperationCollectsDeadObjects);
         Battery.Add("ui", "批量分析确认写回后必须触发一次释放回收", AnalysisCompletionTriggersRelease);
+        // ───── 第六十改（未选择拼合模式时不允许添加图片）─────
+        Battery.Add("ui", "未选择拼合模式时不允许添加图片（选好模式后同一批照常导入）", ImportRequiresModeChosen);
+        Battery.Add("ui", "新建项目保留已选模式，全新会话仍是未选", NewProjectKeepsChosenModeFreshStartsUnset);
     }
 
     /// <summary>
@@ -288,6 +291,9 @@ public static class UiSmokeTests
     /// <summary>
     /// 造一个"已经导入 N 张真 PNG"的主窗口。
     /// 走 ImportPaths 这条产品通路（而不是手工塞文档），这样判据量到的是用户实际操作后的状态。
+    /// 第六十改：产品在导入入口要求"先选模式"，夹具直接把文档字段写成 LongScroll
+    /// （不走 PickModeSegmentForTest——那条真 UI 通路会 Mutate 一次，把「切模式」混进
+    /// 各格正在数的通知笔数/释放计数里，账就全对不上了）。
     /// </summary>
     private static (MainForm Form, string Dir) FormWithImports(int count = 3, int width = 60, int height = 120)
     {
@@ -295,6 +301,7 @@ public static class UiSmokeTests
         List<string> paths = WritePngFiles(dir, count, width, height);
         var form = new MainForm();
         form.CreateControl();
+        form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;
         form.ImportPaths(paths.ToArray());
         form.PerformLayout();
         return (form, dir);
@@ -579,6 +586,7 @@ public static class UiSmokeTests
             {
                 form.CreateControl();
                 int refresh0 = form.UiRefreshCountForTest;
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
                 form.ImportPaths(paths.ToArray());
 
                 int refreshed = form.UiRefreshCountForTest - refresh0;
@@ -612,6 +620,7 @@ public static class UiSmokeTests
             try
             {
                 form.CreateControl();
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
                 form.ImportPaths(paths.ToArray());
 
                 Battery.AssertEqual(files + 2, form.UiRefreshDeferredForTest,
@@ -688,6 +697,7 @@ public static class UiSmokeTests
                 long paints0 = canvas.ScreenPaintsForTest;
                 long deferred0 = canvas.RepaintsDeferredForTest;
 
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
                 form.ImportPaths(paths.ToArray());
 
                 long during = canvas.ScreenPaintsForTest - paints0;
@@ -725,6 +735,7 @@ public static class UiSmokeTests
             try
             {
                 form.CreateControl();
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
                 form.ImportPaths(paths.ToArray());
 
                 const int expected = files + 2;
@@ -1268,6 +1279,7 @@ public static class UiSmokeTests
                 using (var form = new MainForm())
                 {
                     form.CreateControl();
+                    form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
                     form.ImportPaths(pickedPaths);
                     var names = form.ProjectForTest.Doc.Segments
                         .Select(s => form.ProjectForTest.Doc.FindSource(s.SourceId)!.FileName)
@@ -1284,6 +1296,7 @@ public static class UiSmokeTests
                 using (var form2 = new MainForm())
                 {
                     form2.CreateControl();
+                    form2.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
                     form2.ImportPaths(new[] { folder });
                     var names = form2.ProjectForTest.Doc.Segments
                         .Select(s => form2.ProjectForTest.Doc.FindSource(s.SourceId)!.FileName)
@@ -1508,6 +1521,7 @@ public static class UiSmokeTests
 
                 using var form = new MainForm();
                 form.CreateControl();
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
                 form.ImportPaths(paths.ToArray());
                 form.PerformLayout();
 
@@ -1559,6 +1573,7 @@ public static class UiSmokeTests
 
                 using var form = new MainForm();
                 form.CreateControl();
+                form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
                 form.ImportPaths(new[] { file });
                 form.OpenExportDialogForTest(dir);
                 Battery.Evidence("导出对话框构造完成并算出了计划（未点导出，不落盘）");
@@ -2134,6 +2149,107 @@ public static class UiSmokeTests
                 Battery.Evidence($"回填后计数 {before}（不变）；Pick 一次后 {form.ModeSegmentEventCountForTest}（+1）");
             }
             finally { form.Dispose(); TryDelete(dir); }
+        });
+    }
+
+    /// <summary>
+    /// 第六十改（用户要求）：没选长截图／竖拼／横拼之前，图片一律不收——
+    /// 「不是所有人只用长截屏」，原来默认 LongScroll 的做法等于把竖拼／横拼用户
+    /// 静默套上自动去重的语义。闸在 ImportPaths 一处（三个添加出口都汇到那里）。
+    /// 两头各证一端：未选 → 同一批图收 0 张且<b>屏上必须回话</b>
+    /// （静默拒绝最坏的形状是用户以为拖放坏了，反复拖）；选好 → 同一批照常导入
+    /// （闸只拦「没选」，不许把选过模式的正常添加也拦下）。
+    /// 注意这两趟读的是同一批文件、同一张窗体——选模式的动作走 PickModeSegmentForTest
+    /// （真 UI 通路），闸放行的判据才有资格说「用户选完就能加」。
+    /// </summary>
+    private static void ImportRequiresModeChosen()
+    {
+        RunOnStaThread(() =>
+        {
+            string dir = Path.Combine(Path.GetTempPath(), "ls-ui-" + Guid.NewGuid().ToString("N")[..6]);
+            List<string> paths = WritePngFiles(dir, count: 2, width: 60, height: 120);
+            try
+            {
+                var form = new MainForm();
+                try
+                {
+                    form.CreateControl();
+                    _ = form.Handle;
+
+                    // 前提自证：全新窗体的文档必须是「未选」，分段也必须如实显示三档都没抬起——
+                    // 前提不成立（比如有人把默认改回 LongScroll）这格就量不到闸了。
+                    Battery.AssertEqual(StitchMode.Unset, form.ProjectForTest.Doc.Mode,
+                        "前提自证：新建窗体的文档模式必须是 Unset（默认被改走要同步本判据）");
+                    Battery.AssertEqual(-1, form.ModeSegmentIndexForTest,
+                        "前提自证：未选模式时分段下标必须是 -1（三档都没抬起）");
+
+                    form.ImportPaths(paths.ToArray());
+                    Battery.AssertEqual(0, form.ProjectForTest.Doc.Sources.Count,
+                        "没选拼合模式时添加图片必须被拦下：一张都不许进文档（Sources 空）");
+                    Battery.AssertEqual(0, form.ProjectForTest.Doc.Segments.Count,
+                        "没选拼合模式时添加图片必须被拦下：段也不能有（Segments 空）");
+
+                    var label = typeof(MainForm).GetField("_statusInfo",
+                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
+                        .GetValue(form) as ToolStripStatusLabel;
+                    string statusText = label?.Text ?? "";
+                    Battery.Assert(statusText.Contains("拼合模式"),
+                        $"被拦下时状态栏必须回话告诉用户先选模式（现状：{statusText}）" +
+                        "——静默拒绝等于让用户以为拖放坏了");
+
+                    // 选好模式（走真 Pick 通路）后，同一批照常导入。
+                    form.PickModeSegmentForTest(0);
+                    Battery.AssertEqual(StitchMode.LongScroll, form.ProjectForTest.Doc.Mode,
+                        "Pick 通路必须把文档模式切到长截图（闸放行前的必要条件）");
+                    form.ImportPaths(paths.ToArray());
+                    Battery.AssertEqual(2, form.ProjectForTest.Doc.Sources.Count,
+                        "选好模式后同一批图片必须照常导入：闸只拦「没选」，不许把正常添加也拦下");
+                    Battery.AssertEqual(2, form.ProjectForTest.Doc.Segments.Count, "放行后段也要齐（每张一段）");
+                    Battery.Evidence("未选：2 张全拦（状态栏回话）→ Pick 长截图 → 同一批 2 张照常进文档");
+                }
+                finally { form.Dispose(); }
+            }
+            finally { TryDelete(dir); }
+        });
+    }
+
+    /// <summary>
+    /// 第六十改的第二格：新建项目对「已选模式」的记忆规则——
+    /// ① 全新会话（刚开窗体）仍是未选：模式不该替用户默认；
+    /// ② 选过之后 NewProject（反射调私有方法，与真人菜单同一条路）<b>保留</b>已选模式——
+    /// 换一份新文档不必让用户重选一遍；这条同时钉住「继承」而不是「重置为 Unset」，
+    /// 改成重置会让连续新建的用户每张都要再点一次。
+    /// 反射前先 MarkSaved：NewProject 遇到未保存改动会弹确认框，测试不能挂在那儿等真人
+    /// （与 NewProjectClearsSourceCache 同一套按法）。
+    /// </summary>
+    private static void NewProjectKeepsChosenModeFreshStartsUnset()
+    {
+        RunOnStaThread(() =>
+        {
+            var form = new MainForm();
+            try
+            {
+                form.CreateControl();
+                Battery.AssertEqual(StitchMode.Unset, form.ProjectForTest.Doc.Mode,
+                    "全新会话必须是未选：模式不许替用户默认（第一半）");
+
+                var newProject = typeof(MainForm).GetMethod("NewProject",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                Battery.Assert(newProject is not null, "自证：MainForm.NewProject 必须还在（改名要同步本判据）");
+                newProject!.Invoke(form, null);
+                Battery.AssertEqual(StitchMode.Unset, form.ProjectForTest.Doc.Mode,
+                    "全新会话（未选）下新建项目也应保持未选：没有可继承的模式就不许凭空造一个");
+
+                form.PickModeSegmentForTest(1);
+                Battery.AssertEqual(StitchMode.Vertical, form.ProjectForTest.Doc.Mode,
+                    "Pick 竖拼后文档模式必须是 Vertical（要继承的值得先存在）");
+                form.ProjectForTest.MarkSaved();
+                newProject.Invoke(form, null);
+                Battery.AssertEqual(StitchMode.Vertical, form.ProjectForTest.Doc.Mode,
+                    "新建项目必须保留已选模式（继承而不是重置）：改成重置会让连续新建的用户每张都要再点一次");
+                Battery.Evidence("全新会话 Unset → NewProject 仍 Unset → Pick 竖拼 → MarkSaved → NewProject 仍 Vertical（继承）");
+            }
+            finally { form.Dispose(); }
         });
     }
 
@@ -3298,6 +3414,7 @@ public static class UiSmokeTests
                 try
                 {
                     form.CreateControl();
+                    form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
                     form.ImportPaths(paths.ToArray());
                     long decodeCalls = FileSourceResolver.DecodeCallsTotalForTest - callsBefore;
                     Battery.AssertEqual(3L, decodeCalls,
@@ -3461,6 +3578,7 @@ public static class UiSmokeTests
                     // a control until the window handle has been created"（本格第一趟红在这）。
                     // 访问 Handle 属性是强制创建句柄的唯一公开出口。
                     _ = form.Handle;
+                    form.ProjectForTest.Doc.Mode = StitchMode.LongScroll;   // 第六十改：导入闸要求先有模式
                     int before = MemorySnapshot.ReleaseCountForTest;
                     form.ImportPaths(paths.ToArray());
                     var sw = System.Diagnostics.Stopwatch.StartNew();

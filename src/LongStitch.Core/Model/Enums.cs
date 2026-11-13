@@ -2,7 +2,7 @@ using LongStitch.Core.Geometry;
 
 namespace LongStitch.Core.Model;
 
-/// <summary>三种拼合模式（产品需求 §1）。</summary>
+/// <summary>三种拼合模式（产品需求 §1）＋"还没选"这个合法状态（第六十改）。</summary>
 public enum StitchMode
 {
     /// <summary>长截图：同一页面连续滚动所得，自动找重叠、对齐、去重。</summary>
@@ -13,6 +13,17 @@ public enum StitchMode
 
     /// <summary>横拼：独立图片按从左到右首尾排列，不自动去重。</summary>
     Horizontal,
+
+    /// <summary>
+    /// 还没有选择任何模式。这是<b>新建项目</b>的初始状态，不是三种模式之一：
+    /// 匹配、布局、导出都不该见到它——产品在导入入口就把没有模式的文档拦下了
+    /// （用户要求："不是所有人只用长截屏"，必须先明确选长截图／竖拼／横拼才允许添加图片）。
+    /// 放在末位是有意的：界面把 <c>(int)Mode</c> 直接当分段控件下标回填（0/1/2=长截图/竖拼/横拼），
+    /// 把 Unset 插进前面会把这组下标整体挤错一格。
+    /// 旧项目文件里写的是三种模式的名字（JsonStringEnumConverter 按字符串存），读进来不受影响；
+    /// 只有本版本起的新项目才可能存出 "Unset"，旧版程序读它会被解析错误拦下——可接受的前向不兼容。
+    /// </summary>
+    Unset,
 }
 
 /// <summary>拼缝状态。界面必须同时用图标与文字表达，不许只靠颜色（需求 §6 可用性）。</summary>

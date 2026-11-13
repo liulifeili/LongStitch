@@ -5616,7 +5616,12 @@ public sealed class StitchCanvasControl : Control
         Chrome.Text(g, "从截图，到完整长图", new Rectangle(x, y, width, titleHeight),
             Theme.TextPrimary, Theme.UiFontTitle, centered);
         y += titleHeight + 12;
-        Chrome.Text(g, "把截图拖到这里开始", new Rectangle(x, y, width, lineHeight),
+        // 第六十改：模式还没选时，"把截图拖到这里开始"是一句会让人白拖的引导——
+        // 产品在导入入口把没选模式的图片全拦下了。这行文案按文档模式分叉：
+        // 未选 → 先去顶栏选模式；已选 → 照旧引导拖图。
+        bool modeUnset = _project.Doc.Mode == StitchMode.Unset;
+        Chrome.Text(g, modeUnset ? "先在顶栏选择拼合模式（长截图／竖拼／横拼）" : "把截图拖到这里开始",
+            new Rectangle(x, y, width, lineHeight),
             Theme.TextSecondary, Theme.UiFontSmall, centered);
         y += lineHeight;
         Chrome.Text(g, "自动识别重叠 · 逐条检查拼缝 · 按原始像素导出",
