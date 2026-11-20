@@ -30,7 +30,7 @@
     <Company>LongStitch</Company>
     <Version>0.1.0</Version>
     <FileVersion>0.1.0.0</FileVersion>
-    <Copyright>MIT License</Copyright>
+    <Copyright>Copyright © 2026 liulifeili（MIT License）</Copyright>
     <Description>把多张滚动截图按像素精确拼成长图，逐条拼缝可复核可手调的离线桌面工具。</Description>
   </PropertyGroup>
 

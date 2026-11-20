@@ -78,7 +78,9 @@ FILES = {
     "srcpanel": "src/LongStitch.App/UI/SourcePanel.cs",
     "match": "checks/LongStitch.Checks/MatchingTests.cs",
     "srcpanel": "src/LongStitch.App/UI/SourcePanel.cs",
-    "readme": "README.md",
+    # 第六十二改：README 精简改版，原手记（含本门禁钉住的全部原话）整体迁往 docs/开发手记.md，
+    # 键名保留 "readme" 以免下面几十条对账条目逐条改名——只是指向换了文件。
+    "readme": "docs/开发手记.md",
     "red": "docs/精度红线.md",
     "arch": "docs/架构说明.md",
     # 第四十六改：菜单字体那一族的两头之一在渲染器里（item.Font 在 main，TextFont 在这里），
