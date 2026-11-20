@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LongStitch 应用图标（SVG 源稿，定稿版）
+  ─────────────────────────────────────────────────────────
+  造型语义：三张正着摆的小"截图"卡片错位堆叠，对应本工具的核心
+        动作——多张截图叠起来拼成一条长图；蓝底对角渐变打底，
+        左上一道径向柔光提空气感。
+  几何参数：底板圆角 228（约 22%，应用图标惯例）；三张卡片
+        420×260、圆角 44，垂直间距上宽下窄（210 / 180），
+        水平位移按用户指定比例的 2/3 相对中心（512）错开——
+        顶卡 +4%（+41px）、中卡 −6.67%（−68px）、底卡 +5.33%（+55px），
+        任何两张都不垂直对齐；绘制顺序从底到顶。
+  配色：三卡为琥珀黄（#FFF1CF→#FFDFA9）、薄荷绿（#D9F6E8→#AFEACB）、
+        玫瑰粉（#FFDDE2→#FBC0C9）——刻意不用蓝与白，与蓝底形成
+        暖冷对比；底板 #74ACFA→#3D74EA→#2C5CDB 对角渐变；
+        卡片白描边（0.9 不透明度）＋feDropShadow 真高斯软阴影。
+  避撞形红线（用户两轮点名，不得回退）：
+        ①禁用"层叠菱形/薄片"造型——被多款 Layers 类产品占用，
+          有侵权风险；
+        ②三色不用人家那套奶油黄/浅蓝/淡紫马卡龙组合，且不用
+          蓝色与白色色块；
+        ③拼缝虚线+三段硬色卡那一版被否（"很丑"），不得回退；
+        ④位移不许等差（等差节奏太"规律"）。
+  交付物：本文件是唯一源稿；定稿后已导出 assets/ 文件夹三件套
+        ——Icon.svg（同源稿）、Icon.png（1024×1024 高清，圆角外
+        透明底）、Icon.ico（512×512，标准 ICO 容器 PNG 内嵌）。
+        改动本稿后三件需同步重新导出。
+  尺寸：viewBox 1024×1024，任意缩放不失真。
+  ─────────────────────────────────────────────────────────
+-->
+<svg viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <defs>
+    <!-- 底板：对角渐变，左上亮蓝 → 右下深蓝 -->
+    <linearGradient id="lsBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0"    stop-color="#74ACFA" />
+      <stop offset="0.55" stop-color="#3D74EA" />
+      <stop offset="1"    stop-color="#2C5CDB" />
+    </linearGradient>
+
+    <!-- 底板左上柔光：很淡的径向高光，让蓝底有空气感 -->
+    <radialGradient id="lsGlow" cx="0.3" cy="0.2" r="0.9">
+      <stop offset="0"   stop-color="#FFFFFF" stop-opacity="0.22" />
+      <stop offset="0.6" stop-color="#FFFFFF" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- 顶卡：琥珀黄（淡一档，暖色与蓝底互补跳出） -->
+    <linearGradient id="lsC1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFF1CF" />
+      <stop offset="1" stop-color="#FFDFA9" />
+    </linearGradient>
+    <!-- 中卡：薄荷绿（淡一档） -->
+    <linearGradient id="lsC2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#D9F6E8" />
+      <stop offset="1" stop-color="#AFEACB" />
+    </linearGradient>
+    <!-- 底卡：玫瑰粉（淡一档） -->
+    <linearGradient id="lsC3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFDDE2" />
+      <stop offset="1" stop-color="#FBC0C9" />
+    </linearGradient>
+
+    <!-- 软阴影：真高斯模糊（feDropShadow），错位堆叠的立体感全靠它 -->
+    <filter id="lsShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="12" stdDeviation="22" flood-color="#0A3A8F" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- ── 底板：圆角方块（圆角半径约 22%）+ 左上柔光 ── -->
+  <rect x="0" y="0" width="1024" height="1024" rx="228" fill="url(#lsBg)" />
+  <rect x="0" y="0" width="1024" height="1024" rx="228" fill="url(#lsGlow)" />
+
+  <!-- ── 三张正摆小卡：相对中心（512）错位，位移取大版与 1/3 版之间
+          （即原比例的 2/3）：顶卡 +4%（+41px）、中卡 −6.67%（−68px）、
+          底卡 +5.33%（+55px）；垂直间距上宽下窄（210 / 180）；
+          绘制顺序从底到顶 ── 卡片 420×260、圆角 44 -->
+
+  <!-- 底卡：玫瑰粉（中心 x=567, y=690） -->
+  <g filter="url(#lsShadow)">
+    <rect x="357" y="560" width="420" height="260" rx="44" fill="url(#lsC3)"
+          stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="6" />
+  </g>
+
+  <!-- 中卡：薄荷绿（中心 x=444, y=510） -->
+  <g filter="url(#lsShadow)">
+    <rect x="234" y="380" width="420" height="260" rx="44" fill="url(#lsC2)"
+          stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="6" />
+  </g>
+
+  <!-- 顶卡：琥珀黄（中心 x=553, y=300） -->
+  <g filter="url(#lsShadow)">
+    <rect x="343" y="170" width="420" height="260" rx="44" fill="url(#lsC1)"
+          stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="6" />
+  </g>
+</svg>
