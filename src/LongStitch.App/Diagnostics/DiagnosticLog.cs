@@ -38,7 +38,15 @@ public static class DiagnosticLog
     /// <summary>攒够这么多行自动刷一次盘。关键事件不等这个数，当场刷。</summary>
     public const int FlushEveryBufferedLines = 64;
 
-    public static string DirectoryPath => Path.Combine(
+    /// <summary>
+    /// 产品级默认日志目录（第六十四改：发布形态要求数据跟随 exe 所在盘，不在 C 盘乱堆）。
+    /// 启动代码发现 exe 旁有 data 文件夹时设成 data\logs，没有则保持 null。
+    /// 排在 <see cref="DirectoryPath"/> 的最前位，但<b>不</b>与判据工装冲突——
+    /// 工装进程不经过 Program.Main，永远不会设这一枚。
+    /// </summary>
+    public static string? DefaultDirectory { get; set; }
+
+    public static string DirectoryPath => DefaultDirectory ?? Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LongStitch", "logs");
 
     public static string? FilePath => _filePath;

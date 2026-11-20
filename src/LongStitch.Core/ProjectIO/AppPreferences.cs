@@ -38,8 +38,19 @@ public sealed record AppPreferences(ThemePreference Theme)
     /// </summary>
     public static string? StoreOverride { get; set; }
 
-    /// <summary>存储文件路径（目录不存在时由写入方创建）。</summary>
-    public static string StorePath => StoreOverride ?? Path.Combine(
+    /// <summary>
+    /// 产品级默认存储文件（第六十四改：发布形态要求"装/解到哪个盘，数据就跟到哪个盘"）。
+    /// 启动代码发现 exe 旁有 <c>data</c> 文件夹时把它设成 data 下的 preferences.txt；
+    /// 没有则保持 null，退回 Windows 惯例目录。
+    ///
+    /// 为什么不借用 <see cref="StoreOverride"/>：那一枚被架构文档钉成"测试专用接缝（产品代码不读它）"，
+    /// 工装判据靠它改道沙箱。产品自己另立默认字段，优先级排在其下——
+    /// 测试闸永远赢过产品默认，判据在装了 data 文件夹的机器上跑也不会往真 data 里写。
+    /// </summary>
+    public static string? DefaultStore { get; set; }
+
+    /// <summary>存储文件路径（目录不存在时由写入方创建）。优先级：测试闸 &gt; 产品默认（data 文件夹）&gt; Windows 惯例。</summary>
+    public static string StorePath => StoreOverride ?? DefaultStore ?? Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "LongStitch", "preferences.txt");
 

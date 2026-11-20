@@ -43,11 +43,21 @@ LongStitch 把 2 张以上的连续滚动截图拼回一张完整长图，并坚
 
 ## 快速开始
 
-### 方式一：下载免安装版
+发布**两种版本**，按喜好选一个就行（都不需要安装 .NET）：
 
-到 [Releases](https://github.com/liulifeili/LongStitch/releases) 页面下载 `LongStitch.exe`（自包含单文件，约 100–155 MB），双击即可运行，**不需要安装 .NET**。
+### 方式一：绿色版（免安装）
 
-### 方式二：从源码构建
+到 [Releases](https://github.com/liulifeili/LongStitch/releases) 下载 `LongStitch-win-x64-vX.Y.Z.zip`，解压到**任何目录**（包括中文目录）后双击 `LongStitch.exe` 运行。
+
+程序的数据（偏好设置、最近项目、日志）都存在解压目录里的 `data` 文件夹中——删掉解压的文件夹 = 清干净所有痕迹。
+
+### 方式二：安装版
+
+下载 `LongStitch-installer-vX.Y.Z.exe`，双击安装。简体中文安装界面，**不需要管理员权限**，默认装在当前用户目录下，安装时可以改到任何盘——**装到哪个盘，数据就跟到哪个盘**，不会往 C 盘堆文件。
+
+卸载时程序本身会被移除，`data` 文件夹（你的偏好与日志）会保留，手动删掉即可。
+
+### 方式三：从源码构建
 
 需要 [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)，不需要其它任何东西：
 
@@ -56,12 +66,11 @@ dotnet build                                   # 编译
 dotnet run --project src/LongStitch.App        # 打开主程序
 ```
 
-发布成免安装单文件：
+发布成绿色版 / 安装版：
 
 ```powershell
-dotnet publish src/LongStitch.App -c Release -r win-x64 --self-contained `
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
-  -o publish
+.\build.ps1 -Publish -Zip            # 绿色版 zip
+.\build.ps1 -Publish -Installer      # 安装版 exe（需要 Inno Setup 6）
 ```
 
 ## 基本操作

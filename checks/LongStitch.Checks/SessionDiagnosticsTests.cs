@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 using LongStitch.App.Diagnostics;
 using LongStitch.App.UI;
@@ -480,22 +481,75 @@ internal static class SessionDiagnosticsTests
 
         double printedBefore = ParseAfter(h.Canvas.DescribeDiagnostics(), "求和 ");
         double ownBefore = OwnSumThreadTotalMs();
+        // ═══ 空转前先把系统计时器分辨率申请到 1ms ═══
+        // Windows 记线程 CPU 时间靠时钟中断：当整机没人申请细计时器（分辨率退回 15.6ms）
+        // 且机器整体空闲时，busy 线程的 CPU 时间会被严重欠账（本机实测：busy 600ms 只记到
+        // 0~62ms，sleep 也不涨；timeBeginPeriod(1) 后 busy 600ms 能记到 515ms）。
+        // 也就是说这格的绿红取决于"别的程序有没有占着 1ms 计时器"的抽签，与环境无关的实现
+        // 也会被判成环境红。申请 1ms 分辨率是工装侧（Checks 允许 P/Invoke）把抽签钉死；
+        // 产品读数与本格在同一进程里，共享同一份记账口径，不构成"判据环境与产品环境不一致"。
+        // timeBeginPeriod 成功时返回 0（TIMERR_NOERROR），失败返回 TIMERR_NOCANDO——
+        // 它不返回"之前的分辨率"，所以归还时必须原样传 1，不能拿返回值当旧值传。
+        int beginResult = timeBeginPeriod(1);
+        bool reRequested = false;
+        try
+        {
+            SchedulingSpinUntilOwnSumGrows(ownBefore, h, out reRequested,
+                out double ownAfter, out double printedAfter, out double spun);
+            AssertSchedulingReadingTracksCpu(ownBefore, ownAfter, printedBefore, printedAfter, spun);
+            Battery.Evidence($"计时器分辨率申请返回 {beginResult}" +
+                             (reRequested ? "（空转中途补申请过一次）" : "（一次到位）"));
+        }
+        finally
+        {
+            if (beginResult == 0) timeEndPeriod(1);
+            if (reRequested) timeEndPeriod(1);
+        }
+    }
+
+    /// <summary>winmm 计时器分辨率申请/撤销（winmm.dll，Checks 工装允许 P/Invoke）。</summary>
+    [DllImport("winmm.dll")]
+    private static extern int timeBeginPeriod(uint ms);
+
+    [DllImport("winmm.dll")]
+    private static extern int timeEndPeriod(uint ms);
+
+    private static void SchedulingSpinUntilOwnSumGrows(double ownBefore, HudCostTests.Harness h,
+        out bool reRequested, out double ownAfter, out double printedAfter, out double spun)
+    {
         // ═══ 空转多久要自适应，不能钉死一个时间窗 ═══
         // 阈值（15ms）不降，只是把"确实烧到 CPU"这件事的**等待上限**从固定 40ms 改成"最多 400ms，
         // 一到 15ms 就停"。原因不是理论风险：本批就红过一次——那 40ms 整机被别的进程占满，
         // 这条线程 0ms CPU 都没攒到（复跑两遍全绿，红的是环境不是实现）。
         // 固定窗口会把这种偶发写成"产品坏了"，那是假红；上限 400ms 之内还攒不到 15ms，
         // 才是真·这台机器不记线程 CPU 时间，那时判环境、不判产品。
+        // ═══ 另：开头那次申请不保证撑到空转开始 ═══
+        // 第六十四改当天全量电池里红过一次（guard 单独跑绿）：申请了 1ms 分辨率，
+        // 空转 411ms 仍然一笔 CPU 都没记账。当时请求与测量之间隔着整个 canvas 组
+        // （67 格 WPF 窗口的创建与销毁，WPF 关窗时会按引用计数归还它自己申请的
+        // 1ms 分辨率）。所以空转过半还没攒到时补申请一次——幂等的引用计数，
+        // 归还也按次数对称，不会把别人的申请顶掉。
+        reRequested = false;
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        double ownAfter = ownBefore;
+        double after = ownBefore;
         do
         {
-            ownAfter = OwnSumThreadTotalMs();     // 这一下枚举本身就烧 CPU，循环不会空转到天荒地老
+            after = OwnSumThreadTotalMs();        // 这一下枚举本身就烧 CPU，循环不会空转到天荒地老
+            if (!reRequested && sw.ElapsedMilliseconds > 150 && after - ownBefore < 15
+                && timeBeginPeriod(1) == 0)
+            {
+                reRequested = true;
+            }
         }
-        while (ownAfter - ownBefore < 15 && sw.ElapsedMilliseconds < 400);
-        double printedAfter = ParseAfter(h.Canvas.DescribeDiagnostics(), "求和 ");
-        double spun = sw.ElapsedMilliseconds;
+        while (after - ownBefore < 15 && sw.ElapsedMilliseconds < 400);
+        ownAfter = after;
+        printedAfter = ParseAfter(h.Canvas.DescribeDiagnostics(), "求和 ");
+        spun = sw.ElapsedMilliseconds;
+    }
 
+    private static void AssertSchedulingReadingTracksCpu(double ownBefore, double ownAfter,
+        double printedBefore, double printedAfter, double spun)
+    {
         Battery.Assert(ownAfter - ownBefore >= 15,
             $"夹具自证：空转 {spun}ms 之后，工装自己加到的求和只从 {ownBefore:F0} 走到 {ownAfter:F0}ms——" +
             "这台机器要是不记线程自己的 CPU 时间，下面那句「出口也必须涨」就是空判据（这一格改判环境，不改判产品）");

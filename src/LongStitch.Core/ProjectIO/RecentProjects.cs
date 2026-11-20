@@ -29,8 +29,15 @@ public static class RecentProjects
     /// </summary>
     public static string? StoreOverride { get; set; }
 
-    /// <summary>存储文件路径（目录不存在时由写入方创建）。</summary>
-    public static string StorePath => StoreOverride ?? Path.Combine(
+    /// <summary>
+    /// 产品级默认存储文件（第六十四改，形状与 AppPreferences.DefaultStore 一致）：
+    /// 启动代码发现 exe 旁有 data 文件夹时指过去，没有则保持 null。
+    /// 优先级同样是 测试闸（本枚）&gt; 产品默认 &gt; Windows 惯例目录，测试闸永远赢。
+    /// </summary>
+    public static string? DefaultStore { get; set; }
+
+    /// <summary>存储文件路径（目录不存在时由写入方创建）。优先级：测试闸 &gt; 产品默认（data 文件夹）&gt; Windows 惯例。</summary>
+    public static string StorePath => StoreOverride ?? DefaultStore ?? Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "LongStitch", "recent.txt");
 

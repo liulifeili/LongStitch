@@ -1,5 +1,6 @@
 using LongStitch.App.UI;
 using LongStitch.App.Diagnostics;
+using LongStitch.Core.ProjectIO;
 
 namespace LongStitch.App;
 
@@ -27,6 +28,18 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        // 第六十四改：数据目录跟随发布形态。exe 旁有 data 文件夹（绿色版/安装版两种包里都放）时，
+        // 偏好、最近项目、日志三个出口全部落到 data 里——装/解到非 C 盘时 C 盘就不再堆文件；
+        // 没有 data 文件夹则维持 Windows 惯例（%APPDATA%/%LOCALAPPDATA%），老用户升级后行为不变。
+        // 必须在 DiagnosticLog.Start() 与 ThemeController.Load() 之前接线，否则第一份日志与
+        // 第一档偏好就已经按旧路径落盘了。
+        string? dataRoot = DataRoot.Resolve();
+        if (dataRoot is not null)
+        {
+            AppPreferences.DefaultStore = Path.Combine(dataRoot, "preferences.txt");
+            RecentProjects.DefaultStore = Path.Combine(dataRoot, "recent.txt");
+            DiagnosticLog.DefaultDirectory = Path.Combine(dataRoot, "logs");
+        }
         DiagnosticLog.Start();
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) =>
