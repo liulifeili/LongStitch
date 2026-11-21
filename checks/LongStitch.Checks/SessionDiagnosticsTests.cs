@@ -488,20 +488,32 @@ internal static class SessionDiagnosticsTests
         // 也就是说这格的绿红取决于"别的程序有没有占着 1ms 计时器"的抽签，与环境无关的实现
         // 也会被判成环境红。申请 1ms 分辨率是工装侧（Checks 允许 P/Invoke）把抽签钉死；
         // 产品读数与本格在同一进程里，共享同一份记账口径，不构成"判据环境与产品环境不一致"。
+        // ═══ 两个杠杆都要拉，缺一不可 ═══
+        // 独立探针实测（第六十四改当日）：timeBeginPeriod(1) **加** High 优先级两者并用，
+        // busy 600ms 才能记到 515ms；只拉其中一个、或两个都不拉，都可能欠账。
+        // 全量电池里也验证过反面：只申请 1ms 分辨率时，guard 单跑绿、全量跑红过两次
+        // （109→109、281→281，空转都撞满 411ms 上限，中途补申请也救不回来）
+        // ⇒ 单靠分辨率不保证这台机器记账。产品读数与本格在同一进程里共享同一份记账口径，
+        // 临时提优先级只影响工装进程自身，跑完 finally 里还原，不构成"判据环境与产品环境不一致"。
         // timeBeginPeriod 成功时返回 0（TIMERR_NOERROR），失败返回 TIMERR_NOCANDO——
         // 它不返回"之前的分辨率"，所以归还时必须原样传 1，不能拿返回值当旧值传。
         int beginResult = timeBeginPeriod(1);
+        System.Diagnostics.ProcessPriorityClass savedPriority =
+            System.Diagnostics.Process.GetCurrentProcess().PriorityClass;
+        System.Diagnostics.Process.GetCurrentProcess().PriorityClass =
+            System.Diagnostics.ProcessPriorityClass.High;
         bool reRequested = false;
         try
         {
             SchedulingSpinUntilOwnSumGrows(ownBefore, h, out reRequested,
                 out double ownAfter, out double printedAfter, out double spun);
             AssertSchedulingReadingTracksCpu(ownBefore, ownAfter, printedBefore, printedAfter, spun);
-            Battery.Evidence($"计时器分辨率申请返回 {beginResult}" +
+            Battery.Evidence($"计时器分辨率申请返回 {beginResult}、进程优先级 {savedPriority}→High" +
                              (reRequested ? "（空转中途补申请过一次）" : "（一次到位）"));
         }
         finally
         {
+            System.Diagnostics.Process.GetCurrentProcess().PriorityClass = savedPriority;
             if (beginResult == 0) timeEndPeriod(1);
             if (reRequested) timeEndPeriod(1);
         }
@@ -514,6 +526,46 @@ internal static class SessionDiagnosticsTests
     [DllImport("winmm.dll")]
     private static extern int timeEndPeriod(uint ms);
 
+    // ─── 红账环境自报用的四个 kernel32 入口（只在这一格红的时候被调） ───
+    [DllImport("kernel32.dll")]
+    private static extern bool IsProcessInJob(IntPtr process, IntPtr job, out bool isInJob);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetCurrentProcess();
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    [DllImport("kernel32.dll")]
+    private static extern bool GetSystemTimeAdjustment(out uint adjustment, out uint increment, out bool disabled);
+
+    /// <summary>
+    /// 空转攒不到 CPU 时间时拼出的环境自报。三个疑点各量一头：
+    /// ① 系统此刻<b>真实</b>的计时器中断增量（申请了 1ms 不等于系统真的在 1ms 打点）；
+    /// ② 当前线程（就是空转那条）再烧 120ms 看它<b>自己</b>被记了多少——
+    ///   它自己是 0 说明整条通路（调度→记账→读数）都没走，它有数而求和不动才是读数层的毛病；
+    /// ③ 进程是否被套在某个 Job 里——CPU 限额型 Job 会把分辨率与优先级两个杠杆全部作废，
+    ///   且表现恰好是"墙钟照走、CPU 一笔不记"。
+    /// </summary>
+    private static string DescribeAccountingEnvironment()
+    {
+        uint tid = GetCurrentThreadId();
+        double mineBefore = -1;
+        foreach (System.Diagnostics.ProcessThread t in System.Diagnostics.Process.GetCurrentProcess().Threads)
+            if (t.Id == tid) { mineBefore = t.TotalProcessorTime.TotalMilliseconds; break; }
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < 120) { }
+        double mineAfter = -1;
+        foreach (System.Diagnostics.ProcessThread t in System.Diagnostics.Process.GetCurrentProcess().Threads)
+            if (t.Id == tid) { mineAfter = t.TotalProcessorTime.TotalMilliseconds; break; }
+        GetSystemTimeAdjustment(out uint _, out uint increment, out bool _);
+        IsProcessInJob(GetCurrentProcess(), IntPtr.Zero, out bool inJob);
+        using System.Diagnostics.Process proc = System.Diagnostics.Process.GetCurrentProcess();
+        return $"; 环境自报：真实中断增量 {increment * 0.0001:F2}ms、进程在 Job 里={inJob}、" +
+               $"当前线程自己 120ms 只被记 {mineAfter - mineBefore:F0}ms、优先级 {proc.PriorityClass}、" +
+               $"线程数 {proc.Threads.Count}";
+    }
+
     private static void SchedulingSpinUntilOwnSumGrows(double ownBefore, HudCostTests.Harness h,
         out bool reRequested, out double ownAfter, out double printedAfter, out double spun)
     {
@@ -523,12 +575,11 @@ internal static class SessionDiagnosticsTests
         // 这条线程 0ms CPU 都没攒到（复跑两遍全绿，红的是环境不是实现）。
         // 固定窗口会把这种偶发写成"产品坏了"，那是假红；上限 400ms 之内还攒不到 15ms，
         // 才是真·这台机器不记线程 CPU 时间，那时判环境、不判产品。
-        // ═══ 另：开头那次申请不保证撑到空转开始 ═══
-        // 第六十四改当天全量电池里红过一次（guard 单独跑绿）：申请了 1ms 分辨率，
-        // 空转 411ms 仍然一笔 CPU 都没记账。当时请求与测量之间隔着整个 canvas 组
-        // （67 格 WPF 窗口的创建与销毁，WPF 关窗时会按引用计数归还它自己申请的
-        // 1ms 分辨率）。所以空转过半还没攒到时补申请一次——幂等的引用计数，
-        // 归还也按次数对称，不会把别人的申请顶掉。
+        // ═══ 另：1ms 分辨率不保证撑住，过半没攒到就补拉一次 ═══
+        // 全量电池里红过两次（guard 单独跑绿）：申请了 1ms 分辨率，空转 411ms 仍然
+        // 一笔 CPU 都没记账，中途补申请也没救回来（那次红的真正缺的是另一个杠杆——
+        // 进程优先级，见调用方）。补申请本身无害（幂等引用计数，归还按次数对称，
+        // 不会顶掉别人的申请），留着当多一道保险。
         reRequested = false;
         var sw = System.Diagnostics.Stopwatch.StartNew();
         double after = ownBefore;
@@ -552,7 +603,8 @@ internal static class SessionDiagnosticsTests
     {
         Battery.Assert(ownAfter - ownBefore >= 15,
             $"夹具自证：空转 {spun}ms 之后，工装自己加到的求和只从 {ownBefore:F0} 走到 {ownAfter:F0}ms——" +
-            "这台机器要是不记线程自己的 CPU 时间，下面那句「出口也必须涨」就是空判据（这一格改判环境，不改判产品）");
+            "这台机器要是不记线程自己的 CPU 时间，下面那句「出口也必须涨」就是空判据（这一格改判环境，不改判产品）" +
+            DescribeAccountingEnvironment());
         Battery.Assert(printedAfter - printedBefore >= 15,
             $"这条线程已经烧到 {ownAfter - ownBefore:F0}ms 的用户＋内核时间（等了 {spun}ms），" +
             $"出口那行「求和」却从 {printedBefore:F0}ms 只到 {printedAfter:F0}ms：" +

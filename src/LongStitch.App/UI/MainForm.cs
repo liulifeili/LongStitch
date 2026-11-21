@@ -221,6 +221,12 @@ public sealed partial class MainForm : Form
         _encoders.Register(new GdiplusJpegEncoder());
 
         Text = "LongStitch · 长截图拼合工具";
+        // ═══ 窗口图标与 exe 图标是两回事 ═══
+        // csproj 的 <ApplicationIcon> 只把 .ico 嵌进 exe 文件本身（资源管理器、任务栏、
+        // 安装器快捷方式用的是它）；标题栏左上角那枚来自 Form.Icon——不设的话
+        // WinForms 会画一枚通用的。从自己的 exe 里取回同一枚图标：ico 就嵌在这个
+        // exe 里，发布到哪个目录、绿色版还是安装版都成立，不用再带一份 .ico 文件。
+        Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1024, 700);
         // ═══ 第五十五改⑤（用户图5）：默认宽度 1440 → 1600 ═══

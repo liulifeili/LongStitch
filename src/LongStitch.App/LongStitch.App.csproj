@@ -24,7 +24,7 @@
     <AssemblyName>LongStitch</AssemblyName>
     <!-- 免安装单文件发布时在运行时解包到临时目录，保持 exe 只有一个 -->
     <InvariantGlobalization>true</InvariantGlobalization>
-    <ApplicationIcon></ApplicationIcon>
+    <ApplicationIcon>..\..\assets\Icon.ico</ApplicationIcon>
     <Product>LongStitch 长截图拼合工具</Product>
     <AssemblyTitle>LongStitch</AssemblyTitle>
     <Company>LongStitch</Company>
