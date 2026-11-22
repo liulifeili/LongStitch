@@ -3167,8 +3167,9 @@ public static class UiSmokeTests
             try
             {
                 var lines = dialog.BodyLinesForTest;
-                Battery.Assert(lines.Count >= 5,
-                    $"夹具自证：关于正文应量到至少 5 行（实际 {lines.Count}）——枚举空了「铺满」就是空话");
+                // 第六十五改：零依赖那行撤了，正文 3 行 + 尾注 1 行 = 4 行。
+                Battery.Assert(lines.Count >= 4,
+                    $"夹具自证：关于正文应量到至少 4 行（实际 {lines.Count}）——枚举空了「铺满」就是空话");
                 int contentW = dialog.ContentWidthForTest;
                 foreach (Label line in lines)
                 {
