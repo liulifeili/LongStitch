@@ -47,15 +47,25 @@ LongStitch 把 2 张以上的连续滚动截图拼回一张完整长图，并坚
 
 ### 方式一：绿色版（免安装）
 
-到 [Releases](https://github.com/liulifeili/LongStitch/releases) 下载 `LongStitch-win-x64-vX.Y.Z.zip`，解压到**任何目录**（包括中文目录）后双击 `LongStitch.exe` 运行。
+到 [Releases](https://github.com/liulifeili/LongStitch/releases) 下载 `LongStitch-win-x64-v0.1.0.zip`（直达[最新版下载链接](https://github.com/liulifeili/LongStitch/releases/latest/download/LongStitch-win-x64-v0.1.0.zip)），解压到**任何目录**（包括中文目录）后双击 `LongStitch.exe` 运行。
 
 程序的数据（偏好设置、最近项目、日志）都存在解压目录里的 `data` 文件夹中——删掉解压的文件夹 = 清干净所有痕迹。
 
 ### 方式二：安装版
 
-下载 `LongStitch-installer-vX.Y.Z.exe`，双击安装。简体中文安装界面，**不需要管理员权限**，默认装在当前用户目录下，安装时可以改到任何盘——**装到哪个盘，数据就跟到哪个盘**，不会往 C 盘堆文件。
+下载 `LongStitch-installer-v0.1.0.exe`（直达[最新版下载链接](https://github.com/liulifeili/LongStitch/releases/latest/download/LongStitch-installer-v0.1.0.exe)），双击安装。简体中文安装界面，**不需要管理员权限**，默认装在当前用户目录下，安装时可以改到任何盘——**装到哪个盘，数据就跟到哪个盘**，不会往 C 盘堆文件。
 
 卸载时程序本身会被移除，`data` 文件夹（你的偏好与日志）会保留，手动删掉即可。
+
+### 下载后怎么校验
+
+两份发布包都附了 SHA-256 校验值（Release 页里的 `SHA256SUMS.txt`，或点开 Release 说明直接对照）。本机核对：
+
+```powershell
+Get-FileHash .\LongStitch-win-x64-v0.1.0.zip -Algorithm SHA256
+```
+
+算出来的哈希和 `SHA256SUMS.txt` 里的对得上，就是原封未动的原包。另外程序目前没有代码签名证书，第一次运行时 Windows 可能弹蓝色提示，点"更多信息 → 仍要运行"即可。
 
 ### 方式三：从源码构建
 
